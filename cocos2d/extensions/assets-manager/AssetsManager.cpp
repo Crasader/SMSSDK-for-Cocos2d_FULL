@@ -34,6 +34,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <dirent.h>
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+#include <ftw.h>
+#endif
 #endif
 
 #include "base/CCDirector.h"
@@ -663,6 +666,21 @@ void AssetsManager::createStoragePath()
 #endif
 }
 
+namespace
+{
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID)
+    int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+    {
+        int rv = remove(fpath);
+        
+        if (rv)
+            perror(fpath);
+        
+        return rv;
+    }
+#endif
+}
+
 void AssetsManager::destroyStoragePath()
 {
     // Delete recorded version codes.
@@ -677,10 +695,11 @@ void AssetsManager::destroyStoragePath()
     command += "\"" + _storagePath + "\"";
     system(command.c_str());
 #else
-    string command = "rm -r ";
-    // Path may include space.
-    command += "\"" + _storagePath + "\"";
-    system(command.c_str());    
+    nftw(_storagePath.c_str(), unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+//    string command = "rm -r ";
+//    // Path may include space.
+//    command += "\"" + _storagePath + "\"";
+//    system(command.c_str());
 #endif
 }
 
